@@ -7,4 +7,5 @@ public interface UserDAO {
     void updateUser();
     void deleteUser();
     User getUserByNickname(String nickname);
+    boolean authenticate(String user_name, String user_password);
 }
