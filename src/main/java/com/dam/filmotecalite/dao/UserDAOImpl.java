@@ -30,7 +30,8 @@ public class UserDAOImpl implements UserDAO {
         Connection connection = DatabaseConnection.getConnection();
         User user;
         try {
-            PreparedStatement preparedStatement = connection.prepareStatement("SELECT * FROM users WHERE nickname = ?");
+            PreparedStatement preparedStatement = connection.prepareStatement("SELECT * FROM users WHERE user_nickname = ?");
+            preparedStatement.setString(1, nickname);
             ResultSet resultSet = preparedStatement.executeQuery();
             user = null;
             while (resultSet.next()) {
