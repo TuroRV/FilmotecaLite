@@ -35,9 +35,27 @@ public class MovieDAOImpl implements MovieDAO {
     }
 
     @Override
-    public void getAllMovies() {
-
-
+    public ArrayList<Movie> getAllMovies() {
+        Connection connection = DatabaseConnection.getConnection();
+        String sql = "SELECT * FROM movies";
+        try {
+            PreparedStatement preparedStatement = connection.prepareStatement(sql);
+            ResultSet resultSet = preparedStatement.executeQuery();
+            ArrayList<Movie> allMovies = new ArrayList<>();
+            while (resultSet.next()) {
+                Movie movie = new Movie(resultSet.getInt(1),
+                        resultSet.getString(2),
+                        resultSet.getString(3),
+                        resultSet.getString(4),
+                        resultSet.getInt(5),
+                        resultSet.getString(6));
+                allMovies.add(movie);
+            }
+            return allMovies;
+        } catch (SQLException e) {
+            System.out.println("Error cargando las películas");
+        }
+        return  null;
     }
 
     @Override
@@ -87,7 +105,7 @@ public class MovieDAOImpl implements MovieDAO {
     }
 
     @Override
-    public void deleteMovie(Movie movie, int userId) {
+    public void deleteMovieFromFavorites(Movie movie, int userId) {
         Connection connection = DatabaseConnection.getConnection();
         String sql = "DELETE FROM users_movies WHERE id_movie = ? AND id_user= ?";
         try {
@@ -138,5 +156,39 @@ public class MovieDAOImpl implements MovieDAO {
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    @Override
+    public void deleteMovieFromDatabase(Movie movie) {
+        Connection connection = DatabaseConnection.getConnection();
+        String sql = "DELETE FROM movies WHERE movie_id = ?";
+        try {
+            PreparedStatement preparedStatement = connection.prepareStatement(sql);
+            preparedStatement.setInt(1, movie.getId());
+            preparedStatement.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+
+
+    }
+
+    @Override
+    public void updateMovieFromDatabase(Movie movie) {
+        Connection connection = DatabaseConnection.getConnection();
+        try {
+            PreparedStatement preparedStatement = connection.prepareStatement("UPDATE movies SET movie_title = ?, movie_genre = ?, movie_director = ?, movie_duration = ?, movie_agerating = ? WHERE movie_id = ?");
+
+            preparedStatement.setString(1, movie.getTitle());
+            preparedStatement.setString(2, movie.getGenre());
+            preparedStatement.setString(3, movie.getDirector());
+            preparedStatement.setInt(4, movie.getDuration());
+            preparedStatement.setString(5, movie.getRating());
+            preparedStatement.setInt(6, movie.getId());
+            preparedStatement.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+
     }
 }

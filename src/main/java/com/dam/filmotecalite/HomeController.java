@@ -5,17 +5,34 @@ import com.dam.filmotecalite.dao.MovieDAOImpl;
 import javafx.collections.FXCollections;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
+import javafx.fxml.FXMLLoader;
 import javafx.fxml.Initializable;
+import javafx.scene.Node;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.stage.Stage;
 
+import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.ResourceBundle;
 
 public class HomeController implements Initializable {
 
-MovieDAO movieDAO = new MovieDAOImpl();
+
+    MovieDAO movieDAO = new MovieDAOImpl();
+    private boolean showingFavorites = true;
+    @FXML
+    private TableView<Movie> tableView;
+
+    @FXML
+    Label usuarioLabel;
+    @FXML
+    Button mostrarFavoritasButton;
+    @FXML
+    Button mostrarFilmotecaButton;
 
     @FXML
     TableView<Movie> peliculasTableView;
@@ -143,28 +160,44 @@ MovieDAO movieDAO = new MovieDAOImpl();
             showAlert(Alert.AlertType.WARNING,"Duración inválida","Por favor, introduce un número válido para la duración");
         }
 
-        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
-        confirm.setTitle("Confirmar actualización");
-        confirm.setHeaderText("¿Deseas actualizar esta película?");
-        confirm.setContentText("Se sobrescribirán los datos actuales.");
-        confirm.getButtonTypes().setAll(ButtonType.YES, ButtonType.NO);
+        if (showingFavorites) {
+            Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+            confirm.setTitle("Confirmar actualización");
+            confirm.setHeaderText("¿Deseas actualizar esta película?");
+            confirm.setContentText("Se sobrescribirán los datos actuales.");
+            confirm.getButtonTypes().setAll(ButtonType.YES, ButtonType.NO);
 
-        confirm.showAndWait().ifPresent(response -> {
-            if (response == ButtonType.YES) {
+            confirm.showAndWait().ifPresent(response -> {
+                if (response == ButtonType.YES) {
 
-                Movie updated = new Movie(selected.getId(), title,genero,director,Integer.parseInt(duracion),rating);
+                    Movie updated = new Movie(selected.getId(), title,genero,director,Integer.parseInt(duracion),rating);
 
-                movieDAO.updateMovie(updated);
-                cargarPeliculasUsuario();
-                resetFields(null);
-                showAlert(Alert.AlertType.INFORMATION,"Actualizada","Película actualizada correctamente");
-            }
-        });
+                    movieDAO.updateMovie(updated);
+                    cargarPeliculasUsuario();
+                    resetFields(null);
+                    showAlert(Alert.AlertType.INFORMATION,"Actualizada","Película actualizada correctamente");
+                }
+            });
+        }
+        else {
+            Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+            confirm.setTitle("Confirmar actualización");
+            confirm.setHeaderText("¿Deseas actualizar esta película de la base de datos?");
+            confirm.setContentText("Se sobrescribirán los datos de la película. Esta acción no se puede deshacer");
+            confirm.getButtonTypes().setAll(ButtonType.YES, ButtonType.NO);
 
+            confirm.showAndWait().ifPresent(response -> {
+                if (response == ButtonType.YES) {
 
+                    Movie updated = new Movie(selected.getId(), title,genero,director,Integer.parseInt(duracion),rating);
 
-
-
+                    movieDAO.updateMovieFromDatabase(updated);
+                    loadAllMovies();
+                    resetFields(null);
+                    showAlert(Alert.AlertType.INFORMATION,"Actualizada","Película actualizada de la base de datos correctamente");
+                }
+            });
+        }
     }
 
     public void handleDelete(ActionEvent actionEvent) {
@@ -173,19 +206,37 @@ MovieDAO movieDAO = new MovieDAOImpl();
             showAlert(Alert.AlertType.ERROR,"Error de selección","Seleccione una película a eliminar");
         }
         else {
-            Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
-            confirm.setTitle("Confirmar borrado");
-            confirm.setHeaderText("¿Deseas borrar esta película?");
-            confirm.setContentText("Se eliminará la película de tu lista, podrás volver a añadirla más adelante");
-            confirm.getButtonTypes().setAll(ButtonType.YES, ButtonType.NO);
-            confirm.showAndWait().ifPresent(response -> {
-                if (response == ButtonType.YES) {
-                    movieDAO.deleteMovie(selectedMovie,Session.getUser().getUser_id());
-                    cargarPeliculasUsuario();
-                    resetFields(null);
-                    showAlert(Alert.AlertType.INFORMATION,"Película eliminada","Se ha eliminado la película correctamente");
-                }
-            });
+            if (showingFavorites) {
+                Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+                confirm.setTitle("Confirmar borrado");
+                confirm.setHeaderText("¿Deseas borrar esta película?");
+                confirm.setContentText("Se eliminará la película de tu lista, podrás volver a añadirla más adelante");
+                confirm.getButtonTypes().setAll(ButtonType.YES, ButtonType.NO);
+                confirm.showAndWait().ifPresent(response -> {
+                    if (response == ButtonType.YES) {
+                        movieDAO.deleteMovieFromFavorites(selectedMovie,Session.getUser().getUser_id());
+                        cargarPeliculasUsuario();
+
+                        resetFields(null);
+                        showAlert(Alert.AlertType.INFORMATION,"Película eliminada","Se ha eliminado la película correctamente");
+                    }
+                });
+            } else {
+                Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+                confirm.setTitle("Confirmar borrado");
+                confirm.setHeaderText("¿Deseas borrar esta película?");
+                confirm.setContentText("Se eliminará la película de la base de datos, esta acción no se puede deshacer");
+                confirm.getButtonTypes().setAll(ButtonType.YES, ButtonType.NO);
+                confirm.showAndWait().ifPresent(response -> {
+                    if (response == ButtonType.YES) {
+                        movieDAO.deleteMovieFromDatabase(selectedMovie);
+                        loadAllMovies();
+                        resetFields(null);
+                        showAlert(Alert.AlertType.INFORMATION,"Película eliminada","Se ha eliminado la película pemanentemente");
+                    }
+                });
+            }
+
 
         }
     }
@@ -193,10 +244,7 @@ MovieDAO movieDAO = new MovieDAOImpl();
     @Override
     public void initialize(URL url, ResourceBundle resourceBundle) {
 
-        if (!Session.getUser().isUser_isadmin()) {
-            deleteButton.setDisable(true);
-            updateButton.setDisable(true);
-        }
+        usuarioLabel.setText("Usuario Actual: " + Session.getUser().getUser_nickname());
 
         peliculasTableView.getSelectionModel().selectedItemProperty().addListener((obs, oldSelection, newSelection) -> {
             if (newSelection != null) {
@@ -213,6 +261,7 @@ MovieDAO movieDAO = new MovieDAOImpl();
 
 
         cargarPeliculasUsuario();
+        showingFavorites = true;
 
     }
 
@@ -241,5 +290,55 @@ MovieDAO movieDAO = new MovieDAOImpl();
 
         peliculasTableView.getSelectionModel().clearSelection();
 
+    }
+
+    public void mostrarFavoritas(ActionEvent actionEvent) {
+        updateButton.setDisable(false);
+        deleteButton.setDisable(false);
+        showingFavorites = true;
+        cargarPeliculasUsuario();
+    }
+
+    public void mostrarFilmoteca(ActionEvent actionEvent) {
+        if (!Session.getUser().isUser_isadmin()) {
+            updateButton.setDisable(true);
+            deleteButton.setDisable(true);
+        }
+        showingFavorites = false;
+        loadAllMovies();
+    }
+
+    private void loadAllMovies() {
+        ArrayList<Movie> movies = movieDAO.getAllMovies();
+        peliculasTableView.setItems(FXCollections.observableArrayList(movies));
+        showingFavorites = false;
+    }
+
+    public void handleLogout(ActionEvent actionEvent) {
+        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+        confirm.setTitle("Logout");
+        confirm.setContentText("¿Deseas cerrar la sesión actual?");
+        confirm.getButtonTypes().setAll(ButtonType.YES, ButtonType.NO);
+        confirm.showAndWait().ifPresent(response -> {
+            if (response == ButtonType.YES) {
+
+                try {
+                    Session.setUser(null);
+                    Stage stage = (Stage) ((Node) actionEvent.getSource()).getScene().getWindow();
+                    Parent root = FXMLLoader.load(getClass().getResource("login-view.fxml"));
+                    stage.setScene(new Scene(root));
+                    stage.setTitle("FilmotecaLite");
+                    stage.setWidth(400);
+                    stage.setHeight(300);
+                    stage.centerOnScreen();
+                    stage.setResizable(false);
+                    stage.show();
+
+
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        });
     }
 }
